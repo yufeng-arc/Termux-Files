@@ -1,0 +1,129 @@
+#!/data/data/com.termux/files/usr/bin/env bash
+##################################################
+##	Termux starting infomation script	##
+##		Only For Termux			##
+##################################################
+
+set_output_colors(){
+	if [ -n "$(command -v tput)"  ] && [ "$(tput colors 2>/dev/null || echo 0)" -ge 8  ] && [ -z "${PROOT_DISTRO_FORCE_NO_COLORS-}"  ]; then
+		RST="$(tput sgr0)"
+		RED="${RST}$(tput setaf 1)"
+		BRED="${RST}$(tput bold)$(tput setaf 1)"
+		GREEN="${RST}$(tput setaf 2)"
+		YELLOW="${RST}$(tput setaf 3)"
+		BYELLOW="${RST}$(tput bold)$(tput setaf 3)"
+		IYELLOW="${RST}$(tput sitm)$(tput setaf 3)"
+		BLUE="${RST}$(tput setaf 4)"
+		MAGENTA="${RST}$(tput setaf 5)"
+		CYAN="${RST}$(tput setaf 6)"
+		BCYAN="${RST}$(tput bold)$(tput setaf 6)"
+		ICYAN="${RST}$(tput sitm)$(tput setaf 6)"
+	fi
+}
+
+set_infomation_env(){
+	MANUFACTURER=$(getprop ro.product.manufacturer)
+	MODEL=$(getprop ro.product.model)
+	SOC_MANUFACTURER=$(getprop ro.soc.manufacturer)
+	SOC_MODEL=$(getprop ro.soc.model)
+	SOC_BROAD=$(getprop ro.product.board)
+	CPU_ARCHITECTURE_64=$(getprop ro.product.cpu.abilist64)
+	CPU_ARCHITECTURE_32=$(getprop ro.product.cpu.abilist32)
+	GPU=$(clinfo | grep "Device Name" | awk '{print $3}' | sed -n 1p | cut -d '.' -f 1)
+	MEMORY=$(free -m | awk '{print $2/1}' | sed -n 2p | cut -d '.' -f 1)
+	BATTERY=$(termux-battery-status | awk '{print $2/1}' | sed -n 3p | cut -d '.' -f 1)
+	ANDROID_VERSION=$(getprop ro.build.version.release)
+	ANDROID_SDK_VERSION=$(getprop ro.build.version.sdk)
+	KERNEL_VERSION=$(getprop ro.build.kernel.id)
+	BUILD_DATE=$(getprop ro.vendor.build.date)
+	OTA=$(getprop ro.build.display.ota)
+	OTA_VERSION=$(getprop ro.build.version.ota)
+	SEC_PATCH_VERSION=$(getprop ro.build.version.security_patch)
+	TREBLE_PROJECT=$(getprop ro.treble.enabled)
+	if [[ ${TREBLE_PROJECT} = true ]]; then
+		TP_SUPPORT="Enabled"
+	else
+		TP_SUPPORT="Disabled"
+	fi
+	BOOTLOADER_LOCK=$(getprop ro.boot.flash.locked)
+	if [[ ${BOOTLOADER_LOCK} = 1 ]]; then
+		BL_LOCK="Locked"
+	else
+		BL_LOCK="Unlocked"
+	fi
+	AVB_VERSION=$(getprop ro.boot.avb_version)
+	DYNAMIC_PARTITION=$(getprop ro.boot.dynamic_partitions)
+	if [[ ${DYNAMIC_PARTITION} = true ]]; then
+		DSU_SUPPORT="True"
+	else
+		DSU_SUPPORT="False"
+	fi
+	SYSTEM_SLOTS=$(getprop ro.boot.slot_suffix)
+	if [[ ${SYSTEM_SLOTS} = _a ]]; then
+		SYS_SLOT="A-Slot"
+	else
+		SYS_SLOT="B-Slot"
+	fi
+	TERMUX_PACKAGE_MANAGER=$TERMUX_APP__PACKAGE_MANAGER
+	TERMUX_PACKAGE_NAME=$TERMUX_APP__PACKAGE_NAME
+	TERMUX_HOSTNAME=$(uname -n)
+	TERMUX_APP_VERSION=$TERMUX_VERSION
+	TERMUX_API_VERSION=$TERMUX_API_APP__VERSION_NAME
+	TERMUX_SHELL=$SHELL
+}
+termux_logo(){
+	clear
+	echo -e "${BLUE}####################################################################################${RST}"
+	echo -e ${GREEN}
+	cat /data/data/com.termux/files/home/.termux/termux_logo
+	echo -e ${RST}
+}
+termux_starting_infomation(){
+	echo -e "${BLUE}####################################################################################${RST}"
+	echo -e ${GREEN}[${YELLOW} INFO ${GREEN}]${RST} Manufacturer: ${BLUE}${MANUFACTURER} ${RST}
+	echo -e ${GREEN}[${YELLOW} INFO ${GREEN}]${RST} Device Model: ${BLUE}${MODEL} ${RST}
+	echo -e ${GREEN}[${YELLOW} INFO ${GREEN}]${RST} SoC Manufacturer: ${BLUE}${SOC_MANUFACTURER} ${RST}
+	echo -e ${GREEN}[${YELLOW} INFO ${GREEN}]${RST} SoC Model: ${BLUE}${SOC_MODEL} ${RST}
+	echo -e ${GREEN}[${YELLOW} INFO ${GREEN}]${RST} SoC Broad: ${BLUE}${SOC_BROAD} ${RST}
+	echo -e ${GREEN}[${YELLOW} INFO ${GREEN}]${RST} CPU 64-Bit Architecture: ${BLUE}${CPU_ARCHITECTURE_64} ${RST}
+	echo -e ${GREEN}[${YELLOW} INFO ${GREEN}]${RST} CPU 32-Bit Architecture: ${BLUE}${CPU_ARCHITECTURE_32} ${RST}
+	echo -e ${GREEN}[${YELLOW} INFO ${GREEN}]${RST} Graphic: ${BLUE}${GPU} ${RST}
+	echo -e ${GREEN}[${YELLOW} INFO ${GREEN}]${RST} System Memory: ${BLUE}${MEMORY}MB ${RST}
+	echo -e ${GREEN}[${YELLOW} INFO ${GREEN}]${RST} Battery: ${BLUE}${BATTERY}% ${RST}
+	echo -e ${GREEN}[${YELLOW} INFO ${GREEN}]${RST} Android Version: ${BLUE}${ANDROID_VERSION} ${RST}
+	echo -e ${GREEN}[${YELLOW} INFO ${GREEN}]${RST} Android SDK Version: ${BLUE}${ANDROID_SDK_VERSION} ${RST}
+	echo -e ${GREEN}[${YELLOW} INFO ${GREEN}]${RST} Kernel Version: ${BLUE}${KERNEL_VERSION} ${RST}
+	echo -e ${GREEN}[${YELLOW} INFO ${GREEN}]${RST} System Build Date: ${BLUE}${BUILD_DATE} ${RST}
+	echo -e ${GREEN}[${YELLOW} INFO ${GREEN}]${RST} System OTA: ${BLUE}${OTA} ${RST}
+	echo -e ${GREEN}[${YELLOW} INFO ${GREEN}]${RST} OTA Version: ${BLUE}${OTA_VERSION} ${RST}
+	echo -e ${GREEN}[${YELLOW} INFO ${GREEN}]${RST} Security Patch Version: ${BLUE}${SEC_PATCH_VERSION} ${RST}
+	echo -e ${GREEN}[${YELLOW} INFO ${GREEN}]${RST} Treble Project: ${BLUE}${TP_SUPPORT} ${RST}
+	echo -e ${GREEN}[${YELLOW} INFO ${GREEN}]${RST} Bootloader Lock: ${BLUE}${BL_LOCK} ${RST}
+	echo -e ${GREEN}[${YELLOW} INFO ${GREEN}]${RST} AVB Version: ${BLUE}${AVB_VERSION} ${RST}
+	echo -e ${GREEN}[${YELLOW} INFO ${GREEN}]${RST} Dynamic Partition: ${BLUE}${DSU_SUPPORT} ${RST}
+	echo -e ${GREEN}[${YELLOW} INFO ${GREEN}]${RST} System Slot: ${BLUE}${SYS_SLOT} ${RST}
+	echo -e ${GREEN}[${YELLOW} INFO ${GREEN}]${RST} Termux Package Manager: ${BLUE}${TERMUX_PACKAGE_MANAGER} ${RST}
+	echo -e ${GREEN}[${YELLOW} INFO ${GREEN}]${RST} Termux Package Name: ${BLUE}${TERMUX_PACKAGE_NAME} ${RST}
+	echo -e ${GREEN}[${YELLOW} INFO ${GREEN}]${RST} Termux Host Name: ${BLUE}${TERMUX_HOSTNAME} ${RST}
+	echo -e ${GREEN}[${YELLOW} INFO ${GREEN}]${RST} Termux APP Version: ${BLUE}${TERMUX_APP_VERSION} ${RST}
+	echo -e ${GREEN}[${YELLOW} INFO ${GREEN}]${RST} Termux API Version: ${BLUE}${TERMUX_API_VERSION} ${RST}
+	echo -e ${GREEN}[${YELLOW} INFO ${GREEN}]${RST} Termux Shell: ${BLUE}${TERMUX_SHELL} ${RST}
+}
+
+termux_service_start(){
+	echo -e ${GREEN}[${YELLOW} INFO ${GREEN}]${RST} ${BLUE}Starting Termux API Service. ${RST}
+	echo -e ${BYELLOW}Termux API:${YELLOW}
+	termux-api-start
+	echo -e ${RST}${GREEN}[${YELLOW} INFO ${GREEN}]${RST} ${BLUE}Set Termux Wake Lock. ${RST}
+	termux-wake-lock
+	echo -e "${BLUE}####################################################################################${RST}"
+}
+termux_motd(){
+	bash /data/data/com.termux/files/usr/etc/motd.sh
+}
+set_output_colors
+set_infomation_env
+termux_logo
+termux_starting_infomation
+termux_service_start
+termux_motd
