@@ -1,0 +1,415 @@
+#!/data/data/com.termux/files/usr/bin/env bash
+#   >>> Based PRoot <<<
+#    Builder:[Data Delete]
+#
+#
+#
+#   _____ _____              ___
+#   |  __ \  __ \_____  _____|   |_
+#   |   __/     /  _  \/  _  \    _|
+#   |__|  |__|__\_____/\_____/\____|
+#
+########################################################################
+#
+start_script(){
+  whiptail --title "Termux PRoot Scripts" --msgbox "Choose Ok to continue." 10 60⏎
+  clear
+}
+########################################################################
+set_env(){
+  PROOT_BIN="/data/data/com.termux/files/usr/bin/proot"
+  PROOT_CONTAINER="/data/data/com.termux/files/home/proot_container/debian_arm64"
+  PROOT_PROC="/data/data/com.termux/files/home/proot_proc"
+  PROOT_FILES="/data/data/com.termux/files/home/proot_files"
+  TMPDIR="/data/data/com.termux/files/usr/tmp"
+  ANDROID_VERSION="$(getprop ro.product.build.version.release)"
+  TARGET_VERSION="12"
+}
+########################################################################
+set_colors(){
+  if [ -n "$(command -v tput)" ] && [ "$(tput colors 2>/dev/null || echo 0)" -ge 8 ] && [ -z "${PROOT_DISTRO_FORCE_NO_COLORS-}" ]; then
+	  RST="$(tput sgr0)"
+	  RED="${RST}$(tput setaf 1)"
+	  BRED="${RST}$(tput bold)$(tput setaf 1)"
+	  GREEN="${RST}$(tput setaf 2)"
+	  YELLOW="${RST}$(tput setaf 3)"
+	  BYELLOW="${RST}$(tput bold)$(tput setaf 3)"
+	  IYELLOW="${RST}$(tput sitm)$(tput setaf 3)"
+	  BLUE="${RST}$(tput setaf 4)"
+	  MAGENTA="${RST}$(tput setaf 5)"
+	  CYAN="${RST}$(tput setaf 6)"
+	  BCYAN="${RST}$(tput bold)$(tput setaf 6)"
+	  ICYAN="${RST}$(tput sitm)$(tput setaf 6)"
+  else
+	  RED=""
+	  BRED=""
+	  GREEN=""
+	  YELLOW=""
+	  BYELLOW=""
+	  IYELLOW=""
+	  BLUE=""
+	  MAGENTA=""
+	  CYAN=""
+	  BCYAN=""
+	  ICYAN=""
+	  RST=""
+  fi
+}
+########################################################################
+msg(){
+  echo -e "$@" >&2
+}
+########################################################################
+prepare_proot(){
+  umask 0022
+  unset LD_PRELOAD
+  cd $(dirname $0)
+  msg "${GREEN}[${YELLOW} INFO ${GREEN}]${RST} ${BLUE}你好我是丁真${RST}"
+  if [[ ${ANDROID_VERSION} -ge ${TARGET_VERSION} ]] ; then
+	  msg "${GREEN}[${YELLOW} INFO ${GREEN}]${RST} ${BLUE}Android Version is ${ANDROID_VERSION}.${RST}"
+  else
+	  msg "${GREEN}[${RED} ERROR ${GREEN}]${RST} ${BLUE}Only supported Android ${TARGET_VERSION} and above.${RST}" ; exit 1
+  fi
+}
+########################################################################
+check_dir(){
+  ## PRoot Container ##
+  if [ ! -d ${PROOT_CONTAINER} ] ; then
+	  msg "${GREEN}[${RED} ERROR ${GREEN}]${RST} ${BLUE}PRoot Container not found,exiting...${RST}" ; exit 1
+  else
+	  msg "${GREEN}[${YELLOW} INFO ${GREEN}]${RST} ${BLUE}Found PRoot Container.${RST}"
+  fi
+  ## System Directory ##
+  local SYSTEM_DIR_MOUNT
+  for SYSTEM_DIR_MOUNT in /dev /proc /sys /system /data /mnt /system_ext /sdcard \
+	  /vendor /odm /config /acct /apex /oem /product /storage /sdcard/termux_share ; do
+	  if [ ! -d ${SYSTEM_DIR_MOUNT} ] ; then
+		  msg "${GREEN}[${RED} ERROR ${GREEN}]${RST} ${BLUE}${SYSTEM_DIR_MOUNT} not found,exiting...${RST}" ; sleep 0.2; exit 1
+	  else
+		  msg "${GREEN}[${YELLOW} INFO ${GREEN}]${RST} ${BLUE}Mounting ${SYSTEM_DIR_MOUNT}.${RST}" ; sleep 0.1
+	  fi
+  done
+}
+########################################################################
+proot_container_user_whiptail(){
+  NAME=$(whiptail --title "Free-form Input Box" --inputbox "What is your pet's name?" 10 60 Peter 3>&1 1>&2 2>&3)
+  exitstatus=$?
+  if [ $exitstatus = 0 ]; then
+	  echo "已输入"
+  else
+	  echo "取消输入"
+  fi
+}
+
+proot_container_user(){
+  msg "${GREEN}[${YELLOW} INFO ${GREEN}]${RST} ${BLUE}Setting container users.${RST}" ; sleep 0.2
+  PROOT_USER="yufeng-Arch-ZSX759"
+  PROOT_HOME="/home/yufeng-Arch-ZSX759"
+  PROOT_SHELL="/usr/bin/bash"
+  PROOT_LOGIN="sudo -u ${PROOT_USER} ${PROOT_SHELL}"
+  if grep -q "${PROOT_USER}" ${PROOT_CONTAINER}/etc/passwd ; then
+	  USER_ID="1" ;
+  else
+	  USER_ID="0" ;
+  fi
+  if [[ ${USER_ID} == "0" || ( "$#" != "0" && ( "$1" == "-r" || "$1" == "-R" )) ]] ; then
+	  PROOT_USER="root"
+	  PROOT_HOME="/root"
+	  PROOT_SHELL="/bin/bash"
+	  PROOT_LOGIN="${PROOT_SHELL} --login"
+	  if [[ "$#" != "0" && ( "$1" == "-r" || "$1" == "-R" ) ]] ; then
+		  shift
+	  fi
+  fi
+  PROOT_UID=$(grep "^${PROOT_USER}:" ${PROOT_CONTAINER}/etc/passwd | awk -F ':' '{print $3}')
+  PROOT_GID=$(grep "^${PROOT_USER}:" ${PROOT_CONTAINER}/etc/passwd | awk -F ':' '{print $4}')
+  msg "${GREEN}[${YELLOW} INFO ${GREEN}]${RST} ${BLUE}PRoot User is [${PROOT_USER}].${RST}"
+}
+########################################################################
+proot_features_args(){
+  msg "${GREEN}[${YELLOW} INFO ${GREEN}]${RST} ${BLUE}Settting PRoot features.${RST}"
+  PROOT_KOE="true"
+  PROOT_SYSVIPC="true"
+  PROOT_ASHMEM_MEMFD="true"
+  PROOT_H="true"
+  PROOT_P="true"
+  PROOT_L="true"
+  ISOLATED_ENV="true"
+  NEED_CPU_EMU="true"
+  PROOT_SYSDIR_MOUNT="true"
+  PROOT_SYS_MOUNT="true"
+  PROOT_FAKE_PROC="true"
+  DEVICE_PLF="MTK"
+  DEVICE_MANU="OnePlus"
+  TERMUX_HOME_MOUNT="true"
+  PROOT_EXA_FILES="true"
+  TMPDIR_MOUNT="true"
+  SDCARD_MOUNT="true"
+}
+########################################################################
+proot_command(){
+  command="${PROOT_BIN}"
+  if [[ ${PROOT_KOE} = true ]]; then
+	  command+=" --kill-on-exit"
+  fi
+  command+=" --link2symlink"
+  if [[ ${PROOT_SYSVIPC} = true ]]; then
+	  command+=" --sysvipc"
+  fi
+  if [[ ${PROOT_ASHMEM_MEMFD} = true ]]; then
+	  command+=" --ashmem-memfd"
+  fi
+  if [[ ${PROOT_H} = true ]]; then
+	  command+=" -H"
+  fi
+  if [[ ${PROOT_P} = true ]]; then
+	  command+=" -p"
+  fi
+  if [[ ${PROOT_L} = true ]]; then
+	  command+=" -L"
+  fi
+  command+=" --change-id=${PROOT_UID}:${PROOT_GID}"
+  command+=" -S ${PROOT_CONTAINER}"
+  command+=" --mount=/dev"
+  command+=" --mount=/proc"
+  if [[ ${PROOT_SYSDIR_MOUNT} = true ]]; then
+	  for SYSDIR_MOUNT in /sys /mnt /acct /data /storage ; do
+		  command+=" --mount=${SYSDIR_MOUNT}"
+	  done
+  fi
+  command+=" --mount=${PROOT_CONTAINER}/tmp:/dev/shm"
+  if [[ ${PROOT_SYS_MOUNT} = true ]]; then
+	  command+=" --mount=/proc/self/fd/2:/dev/stderr"
+	  command+=" --mount=/proc/self/fd/1:/dev/stdout"
+	  command+=" --mount=/proc/self/fd/0:/dev/stdin"
+	  command+=" --mount=/dev/urandom:/dev/random"
+	  command+=" --mount=/proc/self/fd:/dev/fd"
+	  command+=" --mount=/dev/null:/proc/sys/kernel/cap_last_cap"
+	  command+=" --mount=/data/dalvik-cache"
+	  command+=" --mount=/data/misc/apexdata/com.android.art/dalvik-cache"
+	  command+=" --mount=/dev/null:/dev/tty0"
+	  command+=" --mount=/sys/fs/selinux"
+	  command+=" --mount=/sdcard/termux_share"
+  fi
+  if [[ ${ISOLATED_ENV} = true ]]; then
+	  for DATA_DIR in /data/app /data/dalvik-cache \
+		  /data/misc/apexdata/com.android.art/dalvik-cache; do
+	   	  [ ! -d "${DATA_DIR}" ] && continue
+		  local dir_mode
+		  dir_mode=$(stat --format='%a' "${DATA_DIR}")
+		  if [[ ${dir_mode:2} =~ ^[157]$ ]]; then
+			  command+=" --mount=${DATA_DIR}"
+		  fi
+	  done
+	  unset DATA_DIR
+  fi
+  if [[ ${NEED_CPU_EMU} = true ]]; then
+	  local SYSTEM_MNT
+	  for SYSTEM_MNT in /apex /odm /product /system /system_ext /vendor \
+		  /vendor_dlkm /oem /odm_dlkm /acct /config /d \
+		  /linkerconfig/ld.config.txt \
+		  /linkerconfig/com.android.art/ld.config.txt \
+		  /plat_property_contexts /property_contexts; do
+	          if [ -e "${SYSTEM_MNT}" ]; then
+			  SYSTEM_MNT=$(realpath "${SYSTEM_MNT}")
+		  else
+			  continue
+		  fi
+		  if [ -d "${SYSTEM_MNT}" ]; then
+			  local dir_mode
+			  dir_mode=$(stat --format='%a' "${SYSTEM_MNT}")
+			  if [[ ${dir_mode:2} =~ ^[157]$ ]]; then
+				  command+=" --mount=${SYSTEM_MNT}"
+			  fi
+		  elif [ -f "${SYSTEM_MNT}" ]; then
+			  if head -c 1 "${SYSTEM_MNT}" >/dev/null 2>&1; then
+				  command+=" --mount=${SYSTEM_MNT}"
+			  fi
+		  else
+			  continue
+		  fi
+	  done
+  fi
+  if [[ ${PROOT_FAKE_PROC} = true ]]; then
+	  command+=" --mount=${PROOT_PROC}/acpi:/proc/acpi"
+	  command+=" --mount=${PROOT_PROC}/aed:/proc/aed"
+	  command+=" --mount=${PROOT_PROC}/apusys_logger:/proc/apusys_logger"
+	  command+=" --mount=${PROOT_PROC}/apusys_rv:/proc/apusys_rv"
+	  command+=" --mount=${PROOT_PROC}/aputag:/proc/aputag"
+	  command+=" --mount=${PROOT_PROC}/asound:/proc/asound"
+	  command+=" --mount=${PROOT_PROC}/atf_log:/proc/atf_log"
+	  command+=" --mount=${PROOT_PROC}/blocktag:/proc/blocktag"
+	  command+=" --mount=${PROOT_PROC}/boost_pool:/proc/boost_pool"
+	  command+=" --mount=${PROOT_PROC}/bootconfig:/proc/bootconfig"
+	  command+=" --mount=${PROOT_PROC}/buddyinfo:/proc/buddyinfo"
+	  command+=" --mount=${PROOT_PROC}/bus:/proc/bus"
+	  command+=" --mount=${PROOT_PROC}/cgroups:/proc/cgroups"
+	  command+=" --mount=${PROOT_PROC}/charger:/proc/charger"
+	  command+=" --mount=${PROOT_PROC}/cmdline:/proc/cmdline"
+	  command+=" --mount=${PROOT_PROC}/cmdq:/proc/cmdq"
+	  command+=" --mount=${PROOT_PROC}/consoles:/proc/consoles"
+	  command+=" --mount=${PROOT_PROC}/cpu_loading:/proc/cpu_loading"
+	  command+=" --mount=${PROOT_PROC}/cpudvfs:/proc/cpudvfs"
+	  command+=" --mount=${PROOT_PROC}/cpuinfo:/proc/cpuinfo"
+	  command+=" --mount=${PROOT_PROC}/crypto:/proc/crypto"
+	  command+=" --mount=${PROOT_PROC}/device-tree:/proc/device-tree"
+	  command+=" --mount=${PROOT_PROC}/devices:/proc/devices"
+	  command+=" --mount=${PROOT_PROC}/devinfo:/proc/devinfo"
+	  command+=" --mount=${PROOT_PROC}/diskstats:/proc/diskstats"
+	  command+=" --mount=${PROOT_PROC}/displowpower:/proc/displowpower"
+	  command+=" --mount=${PROOT_PROC}/dma:/proc/dma"
+	  command+=" --mount=${PROOT_PROC}/dma_heap:/proc/dma_heap"
+	  command+=" --mount=${PROOT_PROC}/driver:/proc/driver"
+	  command+=" --mount=${PROOT_PROC}/dynamic_debug:/proc/dynamic_debug"
+	  command+=" --mount=${PROOT_PROC}/eas_opt:/proc/eas_opt"
+	  command+=" --mount=${PROOT_PROC}/eem_lite:/proc/eem_lite"
+	  command+=" --mount=${PROOT_PROC}/execdomains:/proc/execdomains"
+	  command+=" --mount=${PROOT_PROC}/fb:/proc/fb"
+	  command+=" --mount=${PROOT_PROC}/fg_info:/proc/fg_info"
+	  command+=" --mount=${PROOT_PROC}/filesystems:/proc/filesystems"
+	  command+=" --mount=${PROOT_PROC}/fs:/proc/fs"
+	  command+=" --mount=${PROOT_PROC}/game_opt:/proc/game_opt"
+	  command+=" --mount=${PROOT_PROC}/ged:/proc/ged"
+	  command+=" --mount=${PROOT_PROC}/gpueb:/proc/gpueb"
+	  command+=" --mount=${PROOT_PROC}/gpueb_hw_voter:/proc/gpueb_hw_voter"
+	  command+=" --mount=${PROOT_PROC}/gpufreqv2:/proc/gpufreqv2"
+	  command+=" --mount=${PROOT_PROC}/interrupts:/proc/interrupts"
+	  command+=" --mount=${PROOT_PROC}/iomem:/proc/iomem"
+	  command+=" --mount=${PROOT_PROC}/iommu_debug:/proc/iommu_debug"
+	  command+=" --mount=${PROOT_PROC}/ioports:/proc/ioports"
+	  command+=" --mount=${PROOT_PROC}/irq:/proc/irq"
+	  command+=" --mount=${PROOT_PROC}/jank_info:/proc/jank_info"
+	  command+=" --mount=${PROOT_PROC}/kallsyms:/proc/kallsyms"
+	  command+=" --mount=${PROOT_PROC}/key-users:/proc/key-users"
+	  command+=" --mount=${PROOT_PROC}/keys:/proc/keys"
+	  command+=" --mount=${PROOT_PROC}/kpagecount:/proc/kpagecount"
+	  command+=" --mount=${PROOT_PROC}/kpageflags:/proc/kpageflags"
+	  command+=" --mount=${PROOT_PROC}/loadavg:/proc/loadavg"
+	  command+=" --mount=${PROOT_PROC}/locks:/proc/locks"
+	  command+=" --mount=${PROOT_PROC}/mdla:/proc/mdla"
+	  command+=" --mount=${PROOT_PROC}/mdpm:/proc/mdpm"
+	  command+=" --mount=${PROOT_PROC}/mdstat:/proc/mdstat"
+	  command+=" --mount=${PROOT_PROC}/meminfo:/proc/meminfo"
+	  command+=" --mount=${PROOT_PROC}/mgq:/proc/mgq"
+	  command+=" --mount=${PROOT_PROC}/misc:/proc/misc"
+	  command+=" --mount=${PROOT_PROC}/modules:/proc/modules"
+	  command+=" --mount=${PROOT_PROC}/mounts:/proc/mounts"
+	  command+=" --mount=${PROOT_PROC}/mpt:/proc/mpt"
+	  if [[ ${DEVICE_PLF} = MTK ]]; then
+		  command+=" --mount=${PROOT_PROC}/mtk_batoc_throttling:/proc/mtk_batoc_throttling"
+		  command+=" --mount=${PROOT_PROC}/mtk_battery_cmd:/proc/mtk_battery_cmd"
+		  command+=" --mount=${PROOT_PROC}/mtk_gpio:/proc/mtk_gpio"
+		  command+=" --mount=${PROOT_PROC}/mtk_jpeg:/proc/mtk_jpeg"
+		  command+=" --mount=${PROOT_PROC}/mtk_lpm:/proc/mtk_lpm"
+		  command+=" --mount=${PROOT_PROC}/mtk_mali:/proc/mtk_mali"
+		  command+=" --mount=${PROOT_PROC}/mtk_mdp_debug:/proc/mtk_mdp_debug"
+		  command+=" --mount=${PROOT_PROC}/mtk_scheduler:/proc/mtk_scheduler"
+		  command+=" --mount=${PROOT_PROC}/mtk_typec:/proc/mtk_typec"
+		  command+=" --mount=${PROOT_PROC}/mtk_usb:/proc/mtk_usb"
+		  command+=" --mount=${PROOT_PROC}/mtkfb_debug:/proc/mtkfb_debug"
+	  fi
+	  command+=" --mount=${PROOT_PROC}/net:/proc/net"
+	  command+=" --mount=${PROOT_PROC}/olc:/proc/olc"
+	  if [[ ${DEVICE_MANU} = OnePlus ]]; then
+		  command+=" --mount=${PROOT_PROC}/oplusSensorFeature:/proc/oplusSensorFeature"
+		  command+=" --mount=${PROOT_PROC}/oplusVersion:/proc/oplusVersion"
+		  command+=" --mount=${PROOT_PROC}/oplus_cpu:/proc/oplus_cpu"
+		  command+=" --mount=${PROOT_PROC}/oplus_frame_boost:/proc/oplus_frame_boost"
+		  command+=" --mount=${PROOT_PROC}/oplus_healthinfo:/proc/oplus_healthinfo"
+		  command+=" --mount=${PROOT_PROC}/oplus_init_watchdog:/proc/oplus_init_watchdog"
+		  command+=" --mount=${PROOT_PROC}/oplus_locking:/proc/oplus_locking"
+		  command+=" --mount=${PROOT_PROC}/oplus_mem:/proc/oplus_mem"
+		  command+=" --mount=${PROOT_PROC}/oplus_nfc:/proc/oplus_nfc"
+		  command+=" --mount=${PROOT_PROC}/oplus_scheduler:/proc/oplus_scheduler"
+		  command+=" --mount=${PROOT_PROC}/oplus_secure_common:/proc/oplus_secure_common"
+		  command+=" --mount=${PROOT_PROC}/oplus_storage:/proc/oplus_storage"
+		  command+=" --mount=${PROOT_PROC}/oplus_touch_boost:/proc/oplus_touch_boost"
+	  fi
+	  command+=" --mount=${PROOT_PROC}/osvelte:/proc/osvelte"
+	  command+=" --mount=${PROOT_PROC}/pagetypeinfo:/proc/pagetypeinfo"
+	  command+=" --mount=${PROOT_PROC}/partitions:/proc/partitions"
+	  command+=" --mount=${PROOT_PROC}/pbm:/proc/pbm"
+	  command+=" --mount=${PROOT_PROC}/perfmgr:/proc/perfmgr"
+	  command+=" --mount=${PROOT_PROC}/pmsr:/proc/pmsr"
+	  command+=" --mount=${PROOT_PROC}/pressure:/proc/pressure"
+	  command+=" --mount=${PROOT_PROC}/schedstat:/proc/schedstat"
+	  command+=" --mount=${PROOT_PROC}/scp_dvfs:/proc/scp_dvfs"
+	  command+=" --mount=${PROOT_PROC}/scp_hw_voter:/proc/scp_hw_voter"
+	  command+=" --mount=${PROOT_PROC}/scsi:/proc/scsi"
+	  command+=" --mount=${PROOT_PROC}/sensor:/proc/sensor"
+	  command+=" --mount=${PROOT_PROC}/slabinfo:/proc/slabinfo"
+	  command+=" --mount=${PROOT_PROC}/slbc:/proc/slbc"
+	  command+=" --mount=${PROOT_PROC}/slog:/proc/slog"
+	  command+=" --mount=${PROOT_PROC}/sns_debug:/proc/sns_debug"
+	  command+=" --mount=${PROOT_PROC}/softirqs:/proc/softirqs"
+	  command+=" --mount=${PROOT_PROC}/spmtwam:/proc/spmtwam"
+	  command+=" --mount=${PROOT_PROC}/stat:/proc/stat"
+	  command+=" --mount=${PROOT_PROC}/static_power:/proc/static_power"
+	  command+=" --mount=${PROOT_PROC}/swaps:/proc/swaps"
+	  command+=" --mount=${PROOT_PROC}/swpm:/proc/swpm"
+	  command+=" --mount=${PROOT_PROC}/sys:/proc/sys"
+	  command+=" --mount=${PROOT_PROC}/sysvipc:/proc/sysvipc"
+	  command+=" --mount=${PROOT_PROC}/task_info:/proc/task_info"
+	  command+=" --mount=${PROOT_PROC}/task_overload:/proc/task_overload"
+	  command+=" --mount=${PROOT_PROC}/tfa98xx-34:/proc/tfa98xx-34"
+	  command+=" --mount=${PROOT_PROC}/tfa98xx-35:/proc/tfa98xx-35"
+	  command+=" --mount=${PROOT_PROC}/timer_list:/proc/timer_list"
+	  command+=" --mount=${PROOT_PROC}/touchpanel:/proc/touchpanel"
+	  command+=" --mount=${PROOT_PROC}/tty:/proc/tty"
+	  command+=" --mount=${PROOT_PROC}/ufs_signalShow:/proc/ufs_signalShow"
+	  command+=" --mount=${PROOT_PROC}/ufsringbuf:/proc/ufsringbuf"
+	  command+=" --mount=${PROOT_PROC}/uid_cputime:/proc/uid_cputime"
+	  command+=" --mount=${PROOT_PROC}/uid_io:/proc/uid_io"
+	  command+=" --mount=${PROOT_PROC}/uid_procstat:/proc/uid_procstat"
+	  command+=" --mount=${PROOT_PROC}/uptime:/proc/uptime"
+	  command+=" --mount=${PROOT_PROC}/version:/proc/version"
+	  command+=" --mount=${PROOT_PROC}/version_signature:/proc/version_signature"
+	  command+=" --mount=${PROOT_PROC}/vibrator:/proc/vibrator"
+	  command+=" --mount=${PROOT_PROC}/vmallocinfo:/proc/vmallocinfo"
+	  command+=" --mount=${PROOT_PROC}/vmstat:/proc/vmstat"
+	  command+=" --mount=${PROOT_PROC}/zoneinfo:/proc/zoneinfo"
+  fi
+  if [[ ${TERMUX_HOME_MOUNT} = true ]]; then
+	  command+=" --mount=/data/data/com.termux/files/home:/termux"
+  fi
+  if [[ ${PROOT_EXA_FILES} = true ]]; then
+	  command+=" --mount=${PROOT_FILES}/proot_hostname:/etc/hostname"
+	  command+=" --mount=${PROOT_FILES}/proot_hosts:/etc/hosts"
+	  command+=" --mount=${PROOT_FILES}/proot_dns:/etc/resolv.conf"
+	  command+=" --mount=${PROOT_FILES}/proot_locale.conf:/etc/locale.conf"
+	  command+=" --mount=${PROOT_FILES}/proot_locale.gen:/etc/locale.gen"
+	  command+=" --mount=${PROOT_FILES}/proot_environment:/etc/environment"
+	  command+=" --mount=${PREFIX}/lib/dri:/usr/lib/dri"
+	  command+=" --mount=/system/bin/setprop:/usr/local/bin/setprop"
+	  command+=" --mount=/system/bin/getprop:/usr/local/bin/getprop"
+  fi
+  if [[ ${TMPDIR_MOUNT} = true ]]; then
+	  command+=" --mount=${TMPDIR}:/tmp"
+  fi
+  if [[ ${SDCARD_MOUNT} = true ]]; then
+	  command+=" --mount=/sdcard"
+  fi
+  command+=" --pwd=${PROOT_HOME}"
+  command+=" /usr/bin/env -i"
+  command+=" MOZ_FAKE_NO_SANDBOX=1"
+  command+=" HOME=${PROOT_HOME}"
+  command+=" PATH=/usr/local/sbin:/usr/local/bin:/bin:/usr/bin:/sbin:/usr/sbin:/usr/games:/usr/local/games"
+  command+=" TERM=$TERM"
+  command+=" LANG=zh_CN.UTF-8"
+  command+=" LANGUAGE=zh_CN.UTF-8"
+  command+=" ${PROOT_LOGIN}"
+  com="$@"
+  if [ -z "$1" ];then
+	  exec $command
+  else
+	  $command -c "$com"
+  fi
+}
+########################################################################
+set_env
+set_colors
+prepare_proot
+check_dir
+proot_container_user
+proot_features_args
+proot_command
