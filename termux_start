@@ -29,12 +29,13 @@ set_infomation_env(){
 	SOC_BROAD=$(getprop ro.product.board)
 	CPU_ARCHITECTURE_64=$(getprop ro.product.cpu.abilist64)
 	CPU_ARCHITECTURE_32=$(getprop ro.product.cpu.abilist32)
-	GPU=$(clinfo | grep "Device Name" | awk '{print $3}' | sed -n 1p | cut -d '.' -f 1)
+	GPU=$(clinfo | grep "Device Name" | awk '{print $3,$4}' | sed -n 1p | cut -d '.' -f 1)
+	GPU_PLATFORM=$(clinfo | grep "Platform Name" | awk '{print $3,$4}' | sed -n 1p | cut -d '.' -f 1)
 	MEMORY=$(free -m | awk '{print $2/1}' | sed -n 2p | cut -d '.' -f 1)
 	BATTERY=$(termux-battery-status | awk '{print $2/1}' | sed -n 3p | cut -d '.' -f 1)
 	ANDROID_VERSION=$(getprop ro.build.version.release)
 	ANDROID_SDK_VERSION=$(getprop ro.build.version.sdk)
-	KERNEL_VERSION=$(getprop ro.build.kernel.id)
+	KERNEL_VERSION=$(uname -r)
 	BUILD_DATE=$(getprop ro.vendor.build.date)
 	OTA=$(getprop ro.build.display.ota)
 	OTA_VERSION=$(getprop ro.build.version.ota)
@@ -73,13 +74,13 @@ set_infomation_env(){
 }
 termux_logo(){
 	clear
-	echo -e "${BLUE}####################################################################################${RST}"
+	echo -e "${BLUE}########################################################################################${RST}"
 	echo -e ${GREEN}
 	cat /data/data/com.termux/files/home/.termux/termux_logo
 	echo -e ${RST}
 }
 termux_starting_infomation(){
-	echo -e "${BLUE}####################################################################################${RST}"
+	echo -e "${BLUE}########################################################################################${RST}"
 	echo -e ${GREEN}[${YELLOW} INFO ${GREEN}]${RST} Manufacturer: ${BLUE}${MANUFACTURER} ${RST}
 	echo -e ${GREEN}[${YELLOW} INFO ${GREEN}]${RST} Device Model: ${BLUE}${MODEL} ${RST}
 	echo -e ${GREEN}[${YELLOW} INFO ${GREEN}]${RST} SoC Manufacturer: ${BLUE}${SOC_MANUFACTURER} ${RST}
@@ -88,6 +89,7 @@ termux_starting_infomation(){
 	echo -e ${GREEN}[${YELLOW} INFO ${GREEN}]${RST} CPU 64-Bit Architecture: ${BLUE}${CPU_ARCHITECTURE_64} ${RST}
 	echo -e ${GREEN}[${YELLOW} INFO ${GREEN}]${RST} CPU 32-Bit Architecture: ${BLUE}${CPU_ARCHITECTURE_32} ${RST}
 	echo -e ${GREEN}[${YELLOW} INFO ${GREEN}]${RST} Graphic: ${BLUE}${GPU} ${RST}
+	echo -e ${GREEN}[${YELLOW} INFO ${GREEN}]${RST} GPU Platform Name: ${BLUE}${GPU_PLATFORM} ${RST}
 	echo -e ${GREEN}[${YELLOW} INFO ${GREEN}]${RST} System Memory: ${BLUE}${MEMORY}MB ${RST}
 	echo -e ${GREEN}[${YELLOW} INFO ${GREEN}]${RST} Battery: ${BLUE}${BATTERY}% ${RST}
 	echo -e ${GREEN}[${YELLOW} INFO ${GREEN}]${RST} Android Version: ${BLUE}${ANDROID_VERSION} ${RST}
@@ -116,7 +118,7 @@ termux_service_start(){
 	termux-api-start
 	echo -e ${RST}${GREEN}[${YELLOW} INFO ${GREEN}]${RST} ${BLUE}Set Termux Wake Lock. ${RST}
 	termux-wake-lock
-	echo -e "${BLUE}####################################################################################${RST}"
+	echo -e "${BLUE}########################################################################################${RST}"
 }
 termux_motd(){
 	bash /data/data/com.termux/files/usr/etc/motd.sh
